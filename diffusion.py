@@ -80,7 +80,7 @@ class Diffusion(object):
             aff       = self.get_affinity(sims=sims[:, :kd], ids=ids[:, :kd])
             lap_alpha = self.get_laplacian(sims=sims[:, :kd], ids=ids[:, :kd])
         
-        trunc_init = np.zeros(n_trunc)
+        trunc_init    = np.zeros(n_trunc)
         trunc_init[0] = 1
         
         print('[offline] 2) gallery-side diffusion')
