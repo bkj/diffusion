@@ -1,170 +1,144 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
-import os
-import time
+"""
+    diffusion.py
+"""
+
+
 import numpy as np
-import joblib
-from joblib import Parallel, delayed
+from knn import KNN
+from tqdm import tqdm
 import scipy.sparse as sparse
 import scipy.sparse.linalg as linalg
-from tqdm import tqdm
-from knn import KNN, ANN
-
+from joblib import Parallel, delayed
+from scipy.stats import rankdata
 
 trunc_ids  = None
 trunc_init = None
 lap_alpha  = None
+SIM        = None
+aff        = None
+
+def ista(s, adj, alpha=0.15, rho=1.0e-5, epsilon=1e-2):
+    
+    # Compute degree vectors/matrices
+    d       = np.asarray(adj.sum(axis=-1)).squeeze() + 1e-10
+    d_sqrt  = np.sqrt(d)
+    dn_sqrt = 1 / d_sqrt
+    
+    D       = sparse.diags(d)
+    Dn_sqrt = sparse.diags(dn_sqrt)
+    
+    # Normalized adjacency matrix
+    Q = D - ((1 - alpha) / 2) * (D + adj)
+    Q = Dn_sqrt @ Q @ Dn_sqrt
+    
+    # Initialize
+    rad  = rho * alpha * d_sqrt
+    q    = np.zeros(adj.shape[0], dtype=np.float64)
+    
+    grad0 = -alpha * dn_sqrt * s
+    grad  = grad0
+    
+    # Run
+    thresh = rho * alpha * (1 + epsilon)
+    it = 0
+    # while np.abs(grad * dn_sqrt).max() > thresh:
+    for it in range(100):
+        q    = np.maximum(q - grad - rad, 0)
+        grad = grad0 + Q @ q
+        it += 1
+    
+    return q * d_sqrt
+
+
+# from scipy import sparse
+# s_mat = sparse.eye(aff.shape[0]).tocsr()
+# features = ista_mat(s_mat, aff, do_numba=True, alpha=0.2)
+
+# features.nnz / np.prod(features.shape)
+
+# features  = preprocessing.normalize(features, norm="l2", axis=1)
+# scores    = features[:n_query] @ features[n_query:].T
+# ranks     = np.argsort(-scores.todense())
+# compute_map_and_print(gnd_name.split("_")[-1], ranks.T, gnd)
 
 
 def get_offline_result(i):
     ids       = trunc_ids[i]
     trunc_lap = lap_alpha[ids][:, ids]
-    scores, _ = linalg.cg(trunc_lap, trunc_init, tol=1e-6, maxiter=20)
+    scores, _ = linalg.cg(trunc_lap, trunc_init, tol=1e-8, maxiter=1000)
     return scores
 
 
-# def cache(filename):
-#     """Decorator to cache results
-#     """
-#     def decorator(func):
-#         def wrapper(*args, **kw):
-#             self = args[0]
-#             path = os.path.join(self.cache_dir, filename)
-#             time0 = time.time()
-#             if os.path.exists(path):
-#                 result = joblib.load(path)
-#                 cost = time.time() - time0
-#                 print('[cache] loading {} costs {:.2f}s'.format(path, cost))
-#                 return result
-#             result = func(*args, **kw)
-#             cost = time.time() - time0
-#             print('[cache] obtaining {} costs {:.2f}s'.format(path, cost))
-#             joblib.dump(result, path)
-#             return result
-#         return wrapper
-#     return decorator
+def get_offline_result2(i):
+    ids  = trunc_ids[i]
+    taff = aff[ids][:, ids]
+    
+    return ista(trunc_init, taff, alpha=0.2)
 
 
 class Diffusion(object):
-    """Diffusion class
-    """
-    def __init__(self, features, cache_dir):
+    def __init__(self, features, alpha=0.99, gamma=3, kd=50):
         self.features  = features
         self.N         = len(self.features)
-        self.cache_dir = cache_dir
         
-        self.use_ann = self.N >= 100000
-        if self.use_ann:
-            self.ann = ANN(self.features, method='cosine')
+        self.gamma     = gamma
+        self.alpha     = alpha
+        self.kd        = kd
         
         self.knn = KNN(self.features, method='cosine')
+    
+    def get_offline_results(self, n_trunc):
         
-    # @cache('offline.jbl')
-    def get_offline_results(self, n_trunc, kd=50):
-        """Get offline diffusion results for each gallery feature
-        """
-        print('[offline] starting offline diffusion')
-        print('[offline] 1) prepare Laplacian and initial state')
+        global trunc_ids, trunc_init, lap_alpha, SIM, aff
         
-        global trunc_ids, trunc_init, lap_alpha
+        sims, ids = self.knn.search(self.features, n_trunc)
+        trunc_ids = ids
+        aff       = self.get_affinity(s=sims[:, :self.kd], i=ids[:, :self.kd])
+        lap_alpha = self.get_laplacian(aff=aff)
         
-        if self.use_ann:
-            # raise Exception
-            _, trunc_ids = self.ann.search(self.features, n_trunc)
-            sims, ids = self.knn.search(self.features, kd)
-            lap_alpha = self.get_laplacian(sims, ids)
-        else:
-            sims, ids = self.knn.search(self.features, n_trunc)
-            trunc_ids = ids
-            aff       = self.get_affinity(sims=sims[:, :kd], ids=ids[:, :kd])
-            lap_alpha = self.get_laplacian(sims=sims[:, :kd], ids=ids[:, :kd])
+        # <<
+        # vals = Parallel(n_jobs=60, backend='multiprocessing', verbose=True)(
+        #     delayed(get_offline_result2)(i) for i in range(self.N))
         
+        # return np.vstack(vals)
+        # --
         trunc_init    = np.zeros(n_trunc)
         trunc_init[0] = 1
         
-        print('[offline] 2) gallery-side diffusion')
-        results = Parallel(n_jobs=-1, prefer='threads')(delayed(get_offline_result)(i)
-                                      for i in tqdm(range(self.N),
-                                                    desc='[offline] diffusion'))
+        vals = Parallel(n_jobs=60, backend='multiprocessing')(
+            delayed(get_offline_result2)(i) for i in range(self.N))
         
-        all_scores = np.concatenate(results)
-
-        print('[offline] 3) merge offline results')
+        vals = np.concatenate(vals)
+        
         rows = np.repeat(np.arange(self.N), n_trunc)
-        offline = sparse.csr_matrix((all_scores, (rows, trunc_ids.reshape(-1))),
-                                    shape=(self.N, self.N),
-                                    dtype=np.float32)
-        return offline
-
-    # @cache('laplacian.jbl')
-    def get_laplacian(self, sims, ids, alpha=0.99):
-        """Get Laplacian_alpha matrix """
+        cols = trunc_ids.ravel()
         
-        affinity = self.get_affinity(sims, ids)
-        num      = affinity.shape[0]
-        degrees  = affinity @ np.ones(num) + 1e-12
+        return sparse.csr_matrix((vals, (rows, cols)))
+        # >>
         
-        # mat: degree matrix ^ (-1/2)
-        mat = sparse.dia_matrix((degrees ** (-0.5), [0]), shape=(num, num), dtype=np.float32)
+    def get_laplacian(self, aff):
+        n  = aff.shape[0]
         
-        stochastic = mat @ affinity @ mat
-        sparse_eye = sparse.dia_matrix((np.ones(num), [0]), shape=(num, num), dtype=np.float32)
+        D  = aff @ np.ones(n) + 1e-12
+        D  = D ** (-0.5)
+        D  = sparse.diags(D)
         
-        lap_alpha = sparse_eye - alpha * stochastic
-        return lap_alpha
-
-    # @cache('affinity.jbl')
-    def get_affinity(self, sims, ids, gamma=3):
-        """Create affinity matrix for the mutual kNN graph of the whole dataset
-        Args:
-            sims: similarities of kNN
-            ids: indexes of kNN
-        Returns:
-            affinity: affinity matrix
-        """
+        return sparse.eye(n) - self.alpha * (D @ aff @ D)
+    
+    def get_affinity(self, s, i):
         
-        num            = sims.shape[0]
-        sims[sims < 0] = 0  # similarity should be non-negative
+        s = s ** self.gamma
         
-        sims = sims ** gamma
+        row = np.repeat(np.arange(s.shape[0]), s.shape[1])
+        col = np.ravel(i)
+        val = np.ravel(s)
         
-        # vec_ids:  feature vectors' ids
-        # mut_ids:  mutual (reciprocal) nearest neighbors' ids
-        # mut_sims: similarites between feature vectors and their mutual nearest neighbors
+        aff = sparse.csc_matrix((val, (row, col)))
+        aff.setdiag(0)
+        aff = aff.minimum(aff.T)
+        aff.eliminate_zeros()
+        aff.sort_indices()
         
-        vec_ids, mut_ids, mut_sims = [], [], []
-        for i in range(num):
-            # check reciprocity: i is in j's kNN and j is in i's kNN
-            ismutual = np.isin(ids[ids[i]], i).any(axis=1)
-            if ismutual.any():
-                vec_ids.append(i * np.ones(ismutual.sum(), dtype=int))
-                mut_ids.append(ids[i, ismutual])
-                mut_sims.append(sims[i, ismutual])
-        
-        vec_ids, mut_ids, mut_sims = map(np.concatenate, [vec_ids, mut_ids, mut_sims])
-        affinity = sparse.csc_matrix((mut_sims, (vec_ids, mut_ids)),
-                                     shape=(num, num), dtype=np.float32)
-        
-        affinity[range(num), range(num)] = 0
-        return affinity
-
-# # >>
-# # Alternative `get_affinity`
-
-# from scipy import sparse
-
-# s = sims[:, :kd] ** gamma
-# i = ids[:, :kd]
-
-# row = np.repeat(np.arange(s.shape[0]), s.shape[1])
-# col = np.ravel(i)
-# val = np.ravel(s)
-
-# m = sparse.csc_matrix((val, (row, col)))
-# m.setdiag(0)
-# m = m.minimum(m.T)
-# m.eliminate_zeros()
-# m.sort_indices()
-# # <<
-
+        return aff

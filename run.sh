@@ -54,5 +54,14 @@ python rank.py                                                \
     --gallery_path     data/gallery/oxford5k_resnet_glob.npy  \
     --gnd_path         data/gnd_oxford5k.pkl                  \
     --dataset_name     oxford5k                               \
-    --truncation_size  1000
+    --n_trunc          1000
+
+
+python rank.py                                               \
+    --cache_dir        tmp/paris6k_resnet                    \
+    --query_path       data/query/paris6k_resnet_glob.npy    \
+    --gallery_path     data/gallery/paris6k_resnet_glob.npy  \
+    --gnd_path         data/gnd_paris6k.pkl                  \
+    --dataset_name     paris6k                               \
+    --n_trunc          1000
 

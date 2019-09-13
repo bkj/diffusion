@@ -3,7 +3,7 @@ DATA_DIR=./data
 # directory to cache files
 TMP_DIR=./tmp
 # oxford5k, oxford105k, paris6k, paris106k
-DATASET=oxford5k
+DATASET=paris6k
 # resnet or siamac
 FEATURE_TYPE=resnet
 
