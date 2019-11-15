@@ -70,15 +70,6 @@ class Diffusion(object):
             out = normalize(out, norm="l2", axis=1)
         
         return out
-        
-    def get_laplacian(self, aff):
-        n  = aff.shape[0]
-        
-        D = aff @ np.ones(n) + 1e-12
-        D = D ** (-0.5)
-        D = sparse.diags(D)
-        
-        return sparse.eye(n) - self.alpha * (D @ aff @ D)
     
     def get_sym_aff(self, s, i):
         row = np.repeat(np.arange(s.shape[0]), s.shape[1])
@@ -92,3 +83,12 @@ class Diffusion(object):
         aff.sort_indices()
         
         return aff
+        
+    def get_laplacian(self, aff):
+        n  = aff.shape[0]
+        
+        D = aff @ np.ones(n) + 1e-12
+        D = D ** (-0.5)
+        D = sparse.diags(D)
+        
+        return sparse.eye(n) - self.alpha * (D @ aff @ D)
