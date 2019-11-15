@@ -107,4 +107,5 @@ if __name__ == "__main__":
     dataset = Dataset(args.query_path, args.gallery_path)
     queries, gallery = dataset.queries, dataset.gallery
     search()
+    # search_old()
 
