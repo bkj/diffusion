@@ -14,12 +14,15 @@ conda activate diffusion_env
 conda install -y -c pytorch faiss-cpu==1.5.3
 conda install -y joblib==0.13.2
 conda install -y tqdm==4.35.0
-conda install -y h5py==2.10.5
+conda install -y h5py
 conda install -y scipy==1.3.1
 conda install -y scikit-learn==0.21.3
+conda install -y tqdm
 
 # --
 # Download data
+
+mkdir -p data
 
 wget http://cmp.felk.cvut.cz/cnnimageretrieval/data/test/oxford5k/gnd_oxford5k.pkl \
     -O data/gnd_oxford5k.pkl
@@ -49,7 +52,6 @@ python mat2npy.py --dataset_name paris6k --feature_type resnet --mat_dir data
 # Run
 
 python rank.py                                                \
-    --cache_dir        tmp/oxford5k_resnet                    \
     --query_path       data/query/oxford5k_resnet_glob.npy    \
     --gallery_path     data/gallery/oxford5k_resnet_glob.npy  \
     --gnd_path         data/gnd_oxford5k.pkl                  \
@@ -58,7 +60,6 @@ python rank.py                                                \
 
 
 python rank.py                                               \
-    --cache_dir        tmp/paris6k_resnet                    \
     --query_path       data/query/paris6k_resnet_glob.npy    \
     --gallery_path     data/gallery/paris6k_resnet_glob.npy  \
     --gnd_path         data/gnd_paris6k.pkl                  \

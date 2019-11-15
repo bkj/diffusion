@@ -4,140 +4,90 @@
     diffusion.py
 """
 
-
+import faiss
 import numpy as np
-from knn import KNN
-from tqdm import tqdm
 import scipy.sparse as sparse
 import scipy.sparse.linalg as linalg
 from joblib import Parallel, delayed
-from scipy.stats import rankdata
+from sklearn.preprocessing import normalize
 
-trunc_ids  = None
-trunc_init = None
-lap_alpha  = None
-SIM        = None
-aff        = None
+# --
+# Helpers
 
-def ista(s, adj, alpha=0.15, rho=1.0e-5, epsilon=1e-2):
-    
-    # Compute degree vectors/matrices
-    d       = np.asarray(adj.sum(axis=-1)).squeeze() + 1e-10
-    d_sqrt  = np.sqrt(d)
-    dn_sqrt = 1 / d_sqrt
-    
-    D       = sparse.diags(d)
-    Dn_sqrt = sparse.diags(dn_sqrt)
-    
-    # Normalized adjacency matrix
-    Q = D - ((1 - alpha) / 2) * (D + adj)
-    Q = Dn_sqrt @ Q @ Dn_sqrt
-    
-    # Initialize
-    rad  = rho * alpha * d_sqrt
-    q    = np.zeros(adj.shape[0], dtype=np.float64)
-    
-    grad0 = -alpha * dn_sqrt * s
-    grad  = grad0
-    
-    # Run
-    thresh = rho * alpha * (1 + epsilon)
-    it = 0
-    # while np.abs(grad * dn_sqrt).max() > thresh:
-    for it in range(100):
-        q    = np.maximum(q - grad - rad, 0)
-        grad = grad0 + Q @ q
-        it += 1
-    
-    return q * d_sqrt
-
-
-# from scipy import sparse
-# s_mat = sparse.eye(aff.shape[0]).tocsr()
-# features = ista_mat(s_mat, aff, do_numba=True, alpha=0.2)
-
-# features.nnz / np.prod(features.shape)
-
-# features  = preprocessing.normalize(features, norm="l2", axis=1)
-# scores    = features[:n_query] @ features[n_query:].T
-# ranks     = np.argsort(-scores.todense())
-# compute_map_and_print(gnd_name.split("_")[-1], ranks.T, gnd)
-
-
-def get_offline_result(i):
-    ids       = trunc_ids[i]
-    trunc_lap = lap_alpha[ids][:, ids]
-    scores, _ = linalg.cg(trunc_lap, trunc_init, tol=1e-8, maxiter=1000)
-    return scores
-
-
-def get_offline_result2(i):
-    ids  = trunc_ids[i]
-    taff = aff[ids][:, ids]
-    
-    return ista(trunc_init, taff, alpha=0.2)
+_fn = None
+def parmap(f, x, n_jobs):
+    jobs = [delayed(f)(xx) for xx in x]
+    return Parallel(n_jobs=n_jobs, backend='multiprocessing')(jobs)
 
 
 class Diffusion(object):
-    def __init__(self, features, alpha=0.99, gamma=3, kd=50):
-        self.features  = features
-        self.N         = len(self.features)
+    def __init__(self, features, alpha=0.99, gamma=3, kd=50, n_jobs=60):
+        self.features    = features
+        self.n_obs       = self.features.shape[0]
+        self.feature_dim = self.features.shape[1]
         
-        self.gamma     = gamma
-        self.alpha     = alpha
-        self.kd        = kd
+        self.gamma  = gamma
+        self.alpha  = alpha
+        self.kd     = kd
+        self.n_jobs = n_jobs
         
-        self.knn = KNN(self.features, method='cosine')
+        self.knn = faiss.IndexFlatIP(self.feature_dim)
+        self.knn.add(features)
     
-    def get_offline_results(self, n_trunc):
+    def run(self, n_trunc, do_norm):
+        global _fn
         
-        global trunc_ids, trunc_init, lap_alpha, SIM, aff
+        ball_sims, ball_ids = self.knn.search(self.features, n_trunc)
         
-        sims, ids = self.knn.search(self.features, n_trunc)
-        trunc_ids = ids
-        aff       = self.get_affinity(s=sims[:, :self.kd], i=ids[:, :self.kd])
-        lap_alpha = self.get_laplacian(aff=aff)
+        # Make kd-nearest-neighbors symmetric affinity graph
+        neib_sim = ball_sims[:, :self.kd] ** self.gamma
+        neib_ids = ball_ids[:, :self.kd]
+        aff      = self.get_sym_aff(s=neib_sim, i=neib_ids)
         
-        # <<
-        # vals = Parallel(n_jobs=60, backend='multiprocessing', verbose=True)(
-        #     delayed(get_offline_result2)(i) for i in range(self.N))
+        # Make laplacian
+        lap = self.get_laplacian(aff=aff)
         
-        # return np.vstack(vals)
-        # --
-        trunc_init    = np.zeros(n_trunc)
-        trunc_init[0] = 1
+        # Initial signal (query is always most similar to self, so always at index 0)
+        signal    = np.zeros(n_trunc)
+        signal[0] = 1
         
-        vals = Parallel(n_jobs=60, backend='multiprocessing')(
-            delayed(get_offline_result2)(i) for i in range(self.N))
+        # Compute diffusion
+        def _fn(i):
+            trunc_lap = lap[ball_ids[i]][:, ball_ids[i]]
+            scores, _ = linalg.cg(trunc_lap, signal, tol=1e-8, maxiter=1000)
+            return scores
         
+        vals = parmap(_fn, range(self.n_obs), n_jobs=self.n_jobs)
+        
+        # Return sparse matrix representation of diffusion
         vals = np.concatenate(vals)
+        rows = np.repeat(np.arange(self.n_obs), n_trunc)
+        cols = ball_ids.ravel()
         
-        rows = np.repeat(np.arange(self.N), n_trunc)
-        cols = trunc_ids.ravel()
+        out = sparse.csr_matrix((vals, (rows, cols)))
         
-        return sparse.csr_matrix((vals, (rows, cols)))
-        # >>
+        if do_norm:
+            out = normalize(out, norm="l2", axis=1)
+        
+        return out
         
     def get_laplacian(self, aff):
         n  = aff.shape[0]
         
-        D  = aff @ np.ones(n) + 1e-12
-        D  = D ** (-0.5)
-        D  = sparse.diags(D)
+        D = aff @ np.ones(n) + 1e-12
+        D = D ** (-0.5)
+        D = sparse.diags(D)
         
         return sparse.eye(n) - self.alpha * (D @ aff @ D)
     
-    def get_affinity(self, s, i):
-        
-        s = s ** self.gamma
-        
+    def get_sym_aff(self, s, i):
         row = np.repeat(np.arange(s.shape[0]), s.shape[1])
         col = np.ravel(i)
         val = np.ravel(s)
-        
         aff = sparse.csc_matrix((val, (row, col)))
-        aff.setdiag(0)
-        aff = aff.minimum(aff.T)
+        
+        aff.setdiag(0)           # Remove self-similarity
+        aff = aff.minimum(aff.T) # Make symmetric
         aff.eliminate_zeros()
         aff.sort_indices()
         
