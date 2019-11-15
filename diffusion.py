@@ -20,7 +20,7 @@ def parmap(f, x, n_jobs):
     return Parallel(n_jobs=n_jobs, backend='multiprocessing')(jobs)
 
 
-class Diffusion(object):
+class TDiffusion(object):
     def __init__(self, features, alpha=0.99, gamma=3, kd=50, n_jobs=60):
         self.features    = features
         self.n_obs       = self.features.shape[0]
@@ -34,18 +34,19 @@ class Diffusion(object):
         self.knn = faiss.IndexFlatIP(self.feature_dim)
         self.knn.add(features)
     
-    def run(self, n_trunc, do_norm):
+    def run(self, n_trunc, do_norm=True):
         global _fn
         
         ball_sims, ball_ids = self.knn.search(self.features, n_trunc)
+        assert (ball_ids[:,0] == np.arange(ball_ids.shape[0])).all(), 'Normalize features?'
         
-        # Make kd-nearest-neighbors symmetric affinity graph
+        # Compute kd-nearest-neighbors symmetric affinity graph
         neib_sim = ball_sims[:, :self.kd] ** self.gamma
         neib_ids = ball_ids[:, :self.kd]
-        aff      = self.get_sym_aff(s=neib_sim, i=neib_ids)
+        aff      = self._get_sym_aff(s=neib_sim, i=neib_ids)
         
-        # Make laplacian
-        lap = self.get_laplacian(aff=aff)
+        # Compute laplacian
+        lap = self._get_laplacian(aff=aff)
         
         # Initial signal (query is always most similar to self, so always at index 0)
         signal    = np.zeros(n_trunc)
@@ -71,7 +72,7 @@ class Diffusion(object):
         
         return out
     
-    def get_sym_aff(self, s, i):
+    def _get_sym_aff(self, s, i):
         row = np.repeat(np.arange(s.shape[0]), s.shape[1])
         col = np.ravel(i)
         val = np.ravel(s)
@@ -84,7 +85,7 @@ class Diffusion(object):
         
         return aff
         
-    def get_laplacian(self, aff):
+    def _get_laplacian(self, aff):
         n  = aff.shape[0]
         
         D = aff @ np.ones(n) + 1e-12
