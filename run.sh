@@ -52,7 +52,6 @@ python mat2npy.py --dataset_name paris6k --feature_type resnet --mat_dir data
 # Run
 
 python rank.py                                                \
-    --cache_dir        tmp/oxford5k_resnet                    \
     --query_path       data/query/oxford5k_resnet_glob.npy    \
     --gallery_path     data/gallery/oxford5k_resnet_glob.npy  \
     --gnd_path         data/gnd_oxford5k.pkl                  \
@@ -61,7 +60,6 @@ python rank.py                                                \
 
 
 python rank.py                                               \
-    --cache_dir        tmp/paris6k_resnet                    \
     --query_path       data/query/paris6k_resnet_glob.npy    \
     --gallery_path     data/gallery/paris6k_resnet_glob.npy  \
     --gnd_path         data/gnd_paris6k.pkl                  \
