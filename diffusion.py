@@ -48,6 +48,11 @@ class TDiffusion(object):
         neib_ids = ball_ids[:, :self.kd]
         aff      = self._get_sym_aff(s=neib_sim, i=neib_ids)
         
+        # >>
+        # ?? Binarize aff.data
+        # aff.data = np.ones(aff.data.shape[0], dtype=aff.data.dtype)
+        # <<
+        
         # Compute laplacian
         lap = self._get_laplacian(aff=aff)
         
