@@ -1,18 +1,18 @@
 #!/usr/bin/env python
 
 """
-
+    rank.py
 """
 
 # !! Why are the first and second queries identical
 
-
 import os
 import time
-import argparse
 import pickle
+import argparse
 import numpy as np
 from tqdm import tqdm
+
 from dataset import Dataset
 from knn import KNN
 from diffusion import Diffusion

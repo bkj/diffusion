@@ -19,7 +19,7 @@ lap_alpha  = None
 SIM        = None
 aff        = None
 
-def ista(s, adj, alpha=0.15, rho=1.0e-5, epsilon=1e-2):
+def ista(s, adj, alpha=0.15, rho=1e-5, epsilon=1e-5):
     
     # Compute degree vectors/matrices
     d       = np.asarray(adj.sum(axis=-1)).squeeze() + 1e-10

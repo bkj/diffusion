@@ -14,12 +14,15 @@ conda activate diffusion_env
 conda install -y -c pytorch faiss-cpu==1.5.3
 conda install -y joblib==0.13.2
 conda install -y tqdm==4.35.0
-conda install -y h5py==2.10.5
+conda install -y h5py
 conda install -y scipy==1.3.1
 conda install -y scikit-learn==0.21.3
+conda install -y tqdm
 
 # --
 # Download data
+
+mkdir -p data
 
 wget http://cmp.felk.cvut.cz/cnnimageretrieval/data/test/oxford5k/gnd_oxford5k.pkl \
     -O data/gnd_oxford5k.pkl
