@@ -34,10 +34,10 @@ X_queries = np.load(args.query_path)
 X_gallery = np.load(args.gallery_path)
 X         = np.vstack([X_queries, X_gallery])
 
+n_query   = X_queries.shape[0]
+
 # --
 # Search
-
-n_query   = X_queries.shape[0]
 
 features  = Diffusion(features=X, kd=args.kd).run(n_trunc=args.n_trunc, do_norm=True)
 
