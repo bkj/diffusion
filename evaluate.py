@@ -110,10 +110,13 @@ def compute_map(ranks, gnd, kappas=[]):
 def compute_map_and_print(dataset, ranks, gnd, kappas=[1, 5, 10]):
     # old evaluation protocol
     if dataset.startswith("oxford") or dataset.startswith("paris"):
-        map, aps, _, _ = compute_map(ranks, gnd)
-        print(">> {}: mAP {:.2f}".format(dataset,
-                                         np.around(map * 100, decimals=2)))
-
+        MAP, aps, _, _ = compute_map(ranks, gnd)
+        
+        print({
+            "dataset" : dataset,
+            "map"     : MAP * 100,
+        })
+        
     # new evaluation protocol
     elif dataset.startswith("roxford") or dataset.startswith("rparis"):
         gnd_t = []
