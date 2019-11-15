@@ -22,6 +22,8 @@ def parmap(f, x, n_jobs):
 
 class TDiffusion(object):
     def __init__(self, features, alpha=0.99, gamma=3, kd=50, n_jobs=60):
+        assert (np.abs((features ** 2).sum(axis=-1) - 1) < 1e-5).all(), 'Normalize features?'
+        
         self.features    = features
         self.n_obs       = self.features.shape[0]
         self.feature_dim = self.features.shape[1]
@@ -33,12 +35,13 @@ class TDiffusion(object):
         
         self.knn = faiss.IndexFlatIP(self.feature_dim)
         self.knn.add(features)
+        
+        self.aff = None
     
     def run(self, n_trunc, do_norm=True):
         global _fn
         
         ball_sims, ball_ids = self.knn.search(self.features, n_trunc)
-        assert (ball_ids[:,0] == np.arange(ball_ids.shape[0])).all(), 'Normalize features?'
         
         # Compute kd-nearest-neighbors symmetric affinity graph
         neib_sim = ball_sims[:, :self.kd] ** self.gamma
@@ -48,12 +51,12 @@ class TDiffusion(object):
         # Compute laplacian
         lap = self._get_laplacian(aff=aff)
         
-        # Initial signal (query is always most similar to self, so always at index 0)
-        signal    = np.zeros(n_trunc)
-        signal[0] = 1
-        
         # Compute diffusion
         def _fn(i):
+            # Initial signal (usually ball_ids[i] == i occurs at index zero, but sometimes not)
+            signal = np.zeros(n_trunc)
+            signal[ball_ids[i] == i] = 1
+            
             trunc_lap = lap[ball_ids[i]][:, ball_ids[i]]
             scores, _ = linalg.cg(trunc_lap, signal, tol=1e-8, maxiter=1000)
             return scores
@@ -70,6 +73,7 @@ class TDiffusion(object):
         if do_norm:
             out = normalize(out, norm="l2", axis=1)
         
+        self.aff = aff
         return out
     
     def _get_sym_aff(self, s, i):
