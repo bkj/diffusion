@@ -11,6 +11,7 @@ conda activate diffusion_env
 # --
 # Install dependencies
 
+conda install -y pandas
 conda install -y -c pytorch faiss-cpu==1.5.3
 conda install -y joblib==0.13.2
 conda install -y tqdm==4.35.0
