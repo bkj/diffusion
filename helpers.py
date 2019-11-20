@@ -19,4 +19,5 @@ def permute_data(X, y):
 metric_fns = {
     "f1_macro" : lambda act, pred: metrics.f1_score(act, pred, average='macro'),
     "f1"       : lambda act, pred: metrics.f1_score(act, pred, average='binary'),
+    "accuracy" : lambda act, pred: metrics.accuracy_score(act, pred),
 }

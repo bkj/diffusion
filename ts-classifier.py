@@ -30,8 +30,6 @@ from sklearn.model_selection import train_test_split
 from diffusion import VanillaDiffusion
 from helpers import squeezed_array, permute_data, metric_fns
 
-metric_fn = metric_fns['f1']
-
 # --
 # CLI
 
@@ -57,6 +55,8 @@ X_test, y_test = permute_data(X_test, y_test)
 
 X      = np.vstack([X_test, X_train])
 n_test = X_test.shape[0]
+
+metric_fn = metric_fns['f1'] if len(set(y_train)) == 2 else metric_fns['f1_macro']
 
 # --
 # Baselines

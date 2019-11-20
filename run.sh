@@ -19,6 +19,10 @@ conda install -y h5py
 conda install -y scipy==1.3.1
 conda install -y scikit-learn==0.21.3
 conda install -y tqdm
+conda install -y bcolz
+
+pip install matplotlib
+pip install git+https://github.com/bkj/rsub
 
 # --
 # Download data
