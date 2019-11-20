@@ -2,6 +2,9 @@
 
 """
     scratch/active-learning.py
+    
+    Usage:
+        python scratch/active-learning.py --seed 111 --prob-name TwoPatterns
 """
 
 SUPRESS_WARNINGS = True
@@ -77,25 +80,35 @@ np.fill_diagonal(scores, np.inf)
 
 # >>
 
-k = int(0.3 * n_train)
+k = int(0.1 * n_train)
+
+print('-' * 50)
 
 # KMedoids
 kmed     = KMedoids(n_clusters=k, metric='precomputed', max_iter=1000)
 train    = kmed.fit(orig_scores.max() - orig_scores).medoid_indices_
 pred_idx = orig_scores[:,train].argmax(axis=-1)
-print('kmedoid', metric_fn(y, y[train][pred_idx]))
+print('kmedoid   (diff)', metric_fn(y, y[train][pred_idx]))
 
 # Heuristic
 train    = scores.max(axis=0).argsort()[-k:]
 pred_idx = orig_scores[:,train].argmax(axis=-1)
-print('heuristic', metric_fn(y, y[train][pred_idx]))
+print('heuristic (diff)', metric_fn(y, y[train][pred_idx]))
 
 # Random
 train    = np.random.choice(X.shape[0], k, replace=False)
 pred_idx = orig_scores[:,train].argmax(axis=-1)
-print('random', metric_fn(y, y[train][pred_idx]))
+print('random    (diff)', metric_fn(y, y[train][pred_idx]))
+
+print('-' * 50)
+
+# Random (cosine euclidean distance)
+kmed     = KMedoids(n_clusters=k, metric='cosine', max_iter=1000)
+train    = kmed.fit(X).medoid_indices_
+pred_idx = euc_dists[:,train].argmin(axis=-1)
+print('kmedoid    (euc)', metric_fn(y, y[train][pred_idx]))
 
 # Random (cosine euclidean distance)
 train    = np.random.choice(X.shape[0], k, replace=False)
 pred_idx = euc_dists[:,train].argmin(axis=-1)
-print('random (euc)', metric_fn(y, y[train][pred_idx]))
+print('random     (euc)', metric_fn(y, y[train][pred_idx]))
