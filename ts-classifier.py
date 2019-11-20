@@ -69,7 +69,7 @@ model     = KNeighborsClassifier(n_neighbors=1).fit(X_train, y_train)
 pred      = model.predict(X_test)
 knn_score = metric_fn(y_test, pred)
 
-# Why is this worse than exline version?
+# Does this matcht the Exline algorithms?
 
 # --
 

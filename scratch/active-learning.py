@@ -74,7 +74,7 @@ sym_fn  = 'mean'
 orig_scores = VanillaDiffusion(features=X, kd=kd, sym_fn=sym_fn, alpha=0.9).run()
 scores      = orig_scores.copy()
 
-euc_dists = squareform(pdist(X, metric='cosine'))
+cos_dists = squareform(pdist(X, metric='cosine'))
 
 np.fill_diagonal(scores, np.inf)
 
@@ -91,7 +91,7 @@ pred_idx = orig_scores[:,train].argmax(axis=-1)
 print('kmedoid   (diff)', metric_fn(y, y[train][pred_idx]))
 
 # Heuristic
-train    = scores.max(axis=0).argsort()[-k:]
+train    = scores.mean(axis=0).argsort()[-k:]
 pred_idx = orig_scores[:,train].argmax(axis=-1)
 print('heuristic (diff)', metric_fn(y, y[train][pred_idx]))
 
@@ -102,13 +102,16 @@ print('random    (diff)', metric_fn(y, y[train][pred_idx]))
 
 print('-' * 50)
 
-# Random (cosine euclidean distance)
+# Random (cosine cosine distance)
 kmed     = KMedoids(n_clusters=k, metric='cosine', max_iter=1000)
 train    = kmed.fit(X).medoid_indices_
-pred_idx = euc_dists[:,train].argmin(axis=-1)
-print('kmedoid    (euc)', metric_fn(y, y[train][pred_idx]))
+pred_idx = cos_dists[:,train].argmin(axis=-1)
+print('kmedoid    (cos)', metric_fn(y, y[train][pred_idx]))
 
-# Random (cosine euclidean distance)
+# Random (cosine coslidean distance)
 train    = np.random.choice(X.shape[0], k, replace=False)
-pred_idx = euc_dists[:,train].argmin(axis=-1)
-print('random     (euc)', metric_fn(y, y[train][pred_idx]))
+pred_idx = cos_dists[:,train].argmin(axis=-1)
+print('random     (cos)', metric_fn(y, y[train][pred_idx]))
+
+# Note: Accuracyies above are "test on train", but we don't care because we're
+# just looking for relative differences.
