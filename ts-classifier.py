@@ -16,6 +16,7 @@ import os
 os.environ['NUMEXPR_MAX_THREADS'] = '80'
 
 import sys
+import argparse
 import numpy as np
 import pandas as pd
 
@@ -26,31 +27,29 @@ from sklearn import metrics
 from sklearn.preprocessing import normalize
 from sklearn.model_selection import train_test_split
 
-from diffusion import TDiffusion, PlainDiffusion
+from diffusion import VanillaDiffusion
+from helpers import squeezed_array, permute_data, metric_fn
 
-def squeezed_array(x):
-    return np.asarray(x).squeeze()
+# --
+# CLI
 
-def permute_data(X, y):
-    assert X.shape[0] == y.shape[0]
-    p = np.random.permutation(X.shape[0])
-    return X[p], y[p]
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--prob-name', type=str, default='Adiac')
+    parser.add_argument('--seed', type=int, default=123)
+    return parser.parse_args()
 
-def metric_fn(act, pred):
-    return metrics.f1_score(act, pred, average='macro')
-
-np.random.seed(888)
+args = parse_args()
+np.random.seed(args.seed)
 
 # --
 # IO
 
-dataset = 'Adiac'
-
-df_train = pd.read_csv(f'data/ucr/{dataset}/{dataset}_TRAIN.tsv', header=None, sep='\t')
+df_train = pd.read_csv(f'data/ucr/{args.prob_name}/{args.prob_name}_TRAIN.tsv', header=None, sep='\t')
 X_train, y_train = df_train.values[:,1:], df_train.values[:,0]
 X_train, y_train = permute_data(X_train, y_train)
 
-df_test = pd.read_csv(f'data/ucr/{dataset}/{dataset}_TEST.tsv', header=None, sep='\t')
+df_test = pd.read_csv(f'data/ucr/{args.prob_name}/{args.prob_name}_TEST.tsv', header=None, sep='\t')
 X_test, y_test = df_test.values[:,1:], df_test.values[:,0]
 X_test, y_test = permute_data(X_test, y_test)
 
@@ -80,7 +79,7 @@ sym_fn  = 'mean'
 # diffusion_model = TDiffusion(features=X, kd=kd, metric='l2', sym_fn=sym_fn, alpha=0.9)
 # d = diffusion_model.run(n_trunc=n_trunc, do_norm=False)
 # --
-diffusion_model = PlainDiffusion(features=X, kd=kd, sym_fn=sym_fn)
+diffusion_model = VanillaDiffusion(features=X, kd=kd, sym_fn=sym_fn)
 d = diffusion_model.run()
 # <<
 

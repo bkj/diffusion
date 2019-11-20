@@ -21,4 +21,9 @@ cd ../../
 # --
 # Run
 
-python ts-classifier.py
+python ts-classifier.py --prob-name Adiac
+python ts-classifier.py --prob-name FiftyWords
+python ts-classifier.py --prob-name ArrowHead
+python ts-classifier.py --prob-name CinCECGTorso
+
+# Accuracies match exline implementation

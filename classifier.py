@@ -24,15 +24,8 @@ from sklearn.svm import LinearSVC
 from sklearn.preprocessing import normalize
 from sklearn.model_selection import train_test_split
 
-from diffusion import TDiffusion
-
-def squeezed_array(x):
-    return np.asarray(x).squeeze()
-
-def permute_data(X, y):
-    assert X.shape[0] == y.shape[0]
-    p = np.random.permutation(X.shape[0])
-    return X[p], y[p]
+from diffusion import TruncatedDiffusion
+from helpers import squeezed_array, permute_data, metric_fn
 
 np.random.seed(888)
 
@@ -78,7 +71,7 @@ n_trunc = 1000
 kd      = 50
 
 diffusion_model = TDiffusion(features=X, kd=kd)
-d = diffusion_model.run(n_trunc=n_trunc, do_norm=False)
+d = diffusion_model.run(n_trunc=n_trunc)
 d.eliminate_zeros()
 
 scores  = d[:n_test, n_test:]
