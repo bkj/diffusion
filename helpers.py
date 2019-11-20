@@ -16,5 +16,7 @@ def permute_data(X, y):
     p = np.random.permutation(X.shape[0])
     return X[p], y[p]
 
-def metric_fn(act, pred):
-    return metrics.f1_score(act, pred, average='macro')
+metric_fns = {
+    "f1_macro" : lambda act, pred: metrics.f1_score(act, pred, average='macro'),
+    "f1"       : lambda act, pred: metrics.f1_score(act, pred, average='binary'),
+}

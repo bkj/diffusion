@@ -35,6 +35,7 @@ dense_sym_fns = {
 
 
 class TruncatedDiffusion(object):
+    """ From https://arxiv.org/pdf/1811.10907.pdf """
     def __init__(self, features, alpha=0.99, gamma=3, kd=50, n_jobs=60, metric='cosine', sym_fn='minimum'):
         
         self.features    = np.ascontiguousarray(features.astype(np.float32))
@@ -98,10 +99,10 @@ class TruncatedDiffusion(object):
     def _aff2adj(self, s, i):
         row = np.repeat(np.arange(s.shape[0]), s.shape[1])
         col = np.ravel(i)
-        val = np.ravel(s)
+        val = np.ravel(s).clip(min=0)
         adj = sparse.csc_matrix((val, (row, col)))
         
-        assert adj.min() >= 0
+        assert adj.min() >= 0, f'{adj.min()} < 0'
         
         adj.setdiag(0)
         
@@ -125,16 +126,18 @@ class TruncatedDiffusion(object):
 # --
 
 class VanillaDiffusion(object):
-    def __init__(self, features, alpha=0.9, kd=16, metric='euclidean', sym_fn='mean'):
+    """ From: https://arxiv.org/pdf/1703.06935.pdf """
+    def __init__(self, features, alpha=0.9, kd=16, metric='euclidean', sym_fn='mean', binarize=True):
         
         self.features    = features
         self.n_obs       = self.features.shape[0]
         self.feature_dim = self.features.shape[1]
         
         # self.gamma  = gamma # !! How does this fit in?
-        self.alpha  = alpha
-        self.kd     = kd
-        self.metric = metric
+        self.alpha    = alpha
+        self.kd       = kd
+        self.metric   = metric
+        self.binarize = binarize
         
         assert sym_fn in dense_sym_fns
         self.sym_fn = dense_sym_fns[sym_fn]
@@ -153,7 +156,7 @@ class VanillaDiffusion(object):
         D   = np.diag(D)
         
         DAD = D @ adj @ D
-        DAD = (DAD + DAD.T) / 2 # Force exact symmetry
+        DAD = (DAD + DAD.T) / 2 # Force exact symmetry so that `eigsh` doesn't complain
         
         eigval, eigvec = eigsh(DAD, k=n_nodes)
         eigval = eigval.astype(np.float64)
@@ -165,7 +168,7 @@ class VanillaDiffusion(object):
     
     def _dist2adj(self, dist):
         adj = 1 - dist / dist.max()
-        assert adj.min() >= 0
+        assert adj.min() >= 0, f'{adj.min()} < 0'
         
         # No self-loops
         np.fill_diagonal(adj, -np.inf)
@@ -173,7 +176,8 @@ class VanillaDiffusion(object):
         # Binarize adjacency matrix
         threshes = np.sort(adj, axis=0)[-self.kd].reshape(1, -1)
         adj[adj < threshes]  = 0
-        adj[adj >= threshes] = 1
+        if self.binarize:
+            adj[adj >= threshes] = 1
         
         adj = self.sym_fn(adj)
         

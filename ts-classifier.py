@@ -28,7 +28,9 @@ from sklearn.preprocessing import normalize
 from sklearn.model_selection import train_test_split
 
 from diffusion import VanillaDiffusion
-from helpers import squeezed_array, permute_data, metric_fn
+from helpers import squeezed_array, permute_data, metric_fns
+
+metric_fn = metric_fns['f1']
 
 # --
 # CLI
