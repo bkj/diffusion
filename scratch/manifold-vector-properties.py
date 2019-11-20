@@ -55,7 +55,7 @@ X_train, y_train = permute_data(X_train, y_train)
 X_train          = normalize(X_train, 'l2', axis=1)
 
 #X_test = np.load(f'{base_dir}/features/{dataset}/0/test/x.npy')
-#y_test = np.load(f'{base_dir}/features/{dataset}/0/test/y.npy')
+#y_test = np.load(f'{base_dir}/features/{dataset}/0/test/y.npy').
 
 df_test        = pd.read_csv(f'{base_dir}/data/ucr/{args.prob_name}/{args.prob_name}_TEST.tsv', header=None, sep='\t')
 X_test, y_test = df_test.values[:,1:], df_test.values[:,0]
@@ -103,7 +103,7 @@ med_cos_acc = []
 med_cosl_acc = []
 props = [.01, .1, .2, .3, .6]
 for prop in props:
-    k = int(prop * n_train)
+    k = max(5, int(prop * n_train))
     # KMedoids
     kmed = KMedoids(n_clusters=k, metric='precomputed', max_iter=1000)
     train = kmed.fit(orig_scores.max() - orig_scores).medoid_indices_
