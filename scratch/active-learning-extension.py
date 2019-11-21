@@ -70,7 +70,7 @@ def parse_args():
     parser.add_argument('--prob_name', type=str, default='Adiac')
     parser.add_argument('--data_dir', type=str)
     parser.add_argument('--seed', type=int, default=123)
-    parser.add_argument('--ts', type=str, default='true')
+    parser.add_argument('--ts', type=str, default='false')
     return parser.parse_args()
 
 args = parse_args()
@@ -94,15 +94,18 @@ else:
     X_test = np.load(f'{base_dir}/features/{dataset}/0/test/x.npy')
     y_test = np.load(f'{base_dir}/features/{dataset}/0/test/y.npy')
 
-X_train, y_train = permute_data(X_train, y_train)
-X_train          = normalize(X_train, 'l2', axis=1)
-X_test, y_test   = permute_data(X_test, y_test)
-X_test           = normalize(X_test, 'l2', axis=1)
-X                = np.vstack([X_test, X_train])
-y                = np.hstack([y_test, y_train])
+p = np.random.permutation(X_train.shape[0])
 
-X = X[0:3000, :]
-y = y[0:3000]
+#X_train, y_train = permute_data(X_train, y_train)
+X_train = X_train[p]
+y_train = y_train[p]
+X_test = normalize(X_test, 'l2', axis=1)
+X_train = normalize(X_train, 'l2', axis=1)
+X_test, y_test   = permute_data(X_test, y_test)
+X                = np.vstack([X_train, X_test])
+y                = np.hstack([y_train, y_test])
+X                = X[0:5000, :]
+y                = y[0:5000]
 
 metric_fn = metric_fns['f1'] if len(set(y_train)) == 2 else metric_fns['f1_macro']
 n_samples = X.shape[0]
@@ -117,14 +120,13 @@ cos_dists = squareform(pdist(X, metric='cosine'))
 np.fill_diagonal(scores, np.inf)
 
 # Testcases
-props = .1
+props = .4
 k = int(props*n_samples)
 n_weights = 5
 n_entropy = 10
-entropy_iters = 20
+entropy_iters = 1
 
 print("WEIGHTED POINTS")
-print(" ")
 y_hat = weighted_KMedioids(X=orig_scores,
                            y=y,
                            metric_fn=metric_fn,
@@ -136,8 +138,6 @@ y_hat = weighted_KMedioids(X=orig_scores,
                            weighted_point=True)
 
 print("UNWEIGHTED POINTS")
-print(" ")
-
 y_hat = weighted_KMedioids(X=orig_scores,
                            y=y,
                            metric_fn=metric_fn,
@@ -153,28 +153,27 @@ meds = min(n_samples, k + (n_entropy * entropy_iters))
 
 print("equivalent points:", meds)
 
-kmed = KMedoids(n_clusters=meds, metric='precomputed', max_iter=1000)
+kmed = KMedoids(n_clusters=meds, metric='precomputed', max_iter=5000)
 train = kmed.fit(orig_scores.max() - orig_scores).medoid_indices_
 pred_idx = orig_scores[:, train].argmax(axis=-1)
 y_guess_kmed = y[train][pred_idx]
 print('kmedoid, (diff)', metric_fn(y, y_guess_kmed))
 
-kmed = KMedoids(n_clusters=meds, metric='precomputed', max_iter=1000)
+kmed = KMedoids(n_clusters=meds, metric='precomputed', max_iter=5000)
 train = kmed.fit(orig_scores.max() - orig_scores).medoid_indices_
 pred_idx = orig_scores[:, train].argmax(axis=-1)
 y_guess_kmed = y[train][pred_idx]
 print('kmedoid, (diff) + n_entropy', metric_fn(y, y_guess_kmed))
 
 #SVC
-model = svm.LinearSVC().fit(X_train[:k, :], y_train[:k])
+model = svm.LinearSVC().fit(X[train,:], y[train])
 pred = model.predict(X_test)
 print('SVC Linear', metric_fn(y_test, pred))
 
 #RBF
-model = svm.SVC(gamma='scale', kernel='rbf')
-model.fit(X_train[:k, :], y_train[:k])
-pred = model.predict(X_test)
-print('SVC Kernel', metric_fn(y_test, pred))
+model2 = svm.SVC(gamma='scale', decision_function_shape='ovo', kernel='rbf').fit(X[train,:], y[train])
+pred2 = model2.predict(X_test)
+print('SVC Kernel', metric_fn(y_test, pred2))
 
 
 
