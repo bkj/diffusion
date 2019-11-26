@@ -86,6 +86,8 @@ def weighted_KMedioids(X, y, metric_fn, n_clusters=10, max_iter=1000, n_weights=
             for i in range(n):
                 row_weights = X[i, train_idx[pred_max[i,:]]]
                 guess_entropy[i] = entr(row_weights.sum())
+                # ^^ Is this right?  I think is maximized when `row_weights.sum()` is close to 0.5, 
+                # which doesn't totally make sense to me.
 
         print('KMedioid function, accuracy after iter ', iter, ':', metric_fn(y, y_hat))
         highest_entropy = np.argsort(guess_entropy)[::-1][:n_entropy]
