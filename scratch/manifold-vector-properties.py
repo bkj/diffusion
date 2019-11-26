@@ -23,6 +23,8 @@ from sklearn.preprocessing import normalize
 from sklearn.model_selection import train_test_split
 
 from sklearn_extra.cluster import KMedoids
+from sklearn import svm
+
 from diffusion import VanillaDiffusion
 from helpers import squeezed_array, permute_data, metric_fns
 
@@ -46,19 +48,18 @@ dataset  = args.prob_name
 base_dir = args.data_dir
 model    = 'resnet18'
 
-#X_train = np.load(f'{base_dir}/features/{dataset}/0/train/x.npy')
-#y_train = np.load(f'{base_dir}/features/{dataset}/0/train/y.npy')
-
-df_train         = pd.read_csv(f'{base_dir}/data/ucr/{args.prob_name}/{args.prob_name}_TRAIN.tsv', header=None, sep='\t')
-X_train, y_train = df_train.values[:,1:], df_train.values[:,0]
+X_train = np.load(f'{base_dir}/features/{dataset}/0/train/x.npy')
+y_train = np.load(f'{base_dir}/features/{dataset}/0/train/y.npy')
+#df_train         = pd.read_csv(f'{base_dir}/data/ucr/{args.prob_name}/{args.prob_name}_TRAIN.tsv', header=None, sep='\t')
+#X_train, y_train = df_train.values[:,1:], df_train.values[:,0]
 X_train, y_train = permute_data(X_train, y_train)
 X_train          = normalize(X_train, 'l2', axis=1)
 
-#X_test = np.load(f'{base_dir}/features/{dataset}/0/test/x.npy')
-#y_test = np.load(f'{base_dir}/features/{dataset}/0/test/y.npy').
+X_test = np.load(f'{base_dir}/features/{dataset}/0/test/x.npy')
+y_test = np.load(f'{base_dir}/features/{dataset}/0/test/y.npy')
 
-df_test        = pd.read_csv(f'{base_dir}/data/ucr/{args.prob_name}/{args.prob_name}_TEST.tsv', header=None, sep='\t')
-X_test, y_test = df_test.values[:,1:], df_test.values[:,0]
+#df_test        = pd.read_csv(f'{base_dir}/data/ucr/{args.prob_name}/{args.prob_name}_TEST.tsv', header=None, sep='\t')
+#X_test, y_test = df_test.values[:,1:], df_test.values[:,0]
 X_test, y_test = permute_data(X_test, y_test)
 X_test         = normalize(X_test, 'l2', axis=1)
 
@@ -101,7 +102,10 @@ heur_acc = []
 rand_acc = []
 med_cos_acc = []
 med_cosl_acc = []
-props = [.01, .1, .2, .3, .6]
+svc_acc = []
+ksvc_acc = []
+props = [.1, .2, .3, .6, .8]
+
 for prop in props:
     k = max(5, int(prop * n_train))
     # KMedoids
@@ -131,6 +135,16 @@ for prop in props:
     pred_idx = cos_dists[:, train].argmin(axis=-1)
     med_cosl_acc.append(metric_fn(y, y[train][pred_idx]))
 
+    #SVC
+    model = svm.LinearSVC().fit(X_train[:k], y_train[:k])
+    pred = model.predict(X_test)
+    svc_acc.append(metric_fn(y_test, pred))
+
+    #RBF
+    model = svm.SVC(decision_function_shape='ovo', kernel='rbf').fit(X_train[:k], y_train[:k])
+    pred = model.predict(X_test)
+    ksvc_acc.append(metric_fn(y_test, pred))
+
 
 # Top-5
 wrtCOS = []
@@ -150,8 +164,10 @@ ax1.plot(props, heur_acc)
 ax1.plot(props, rand_acc)
 ax1.plot(props, med_cos_acc)
 ax1.plot(props, med_cosl_acc)
+ax1.plot(props, svc_acc)
+ax1.plot(props, ksvc_acc)
 ax1.set(xlabel='k count as prop of train', ylabel='accuracy')
-ax1.legend(['medioids', 'heuristic', 'random', 'mediod_cos', 'random_cos'], loc='upper left')
+ax1.legend(['medioids', 'heuristic', 'random', 'mediod_cos', 'random_cos', 'svm', 'ksvm'], loc='upper left')
 
 ax2.plot(np.log(setlist), wrtCOS)
 ax2.plot(np.log(setlist), wrtDIFF)
