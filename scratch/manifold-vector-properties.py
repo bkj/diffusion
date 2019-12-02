@@ -1,7 +1,7 @@
 
 
 """
-    metric_cosine_diffiusion.py
+    manifold-vector-properties.py
 
     comparison between distances in cosine and diffusion (fourier?) space.
     Question 1: What is the relation between these two sets of distances for various manifolds produced by CNN features?
