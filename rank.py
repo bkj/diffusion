@@ -11,7 +11,8 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 
-from diffusion import Diffusion
+from sklearn.preprocessing import normalize
+from diffusion import TruncatedDiffusion
 from evaluate import compute_map_and_print
 
 def parse_args():
@@ -39,7 +40,8 @@ n_query   = X_queries.shape[0]
 # --
 # Search
 
-features  = Diffusion(features=X, kd=args.kd).run(n_trunc=args.n_trunc, do_norm=True)
+features = TruncatedDiffusion(features=X, kd=args.kd).run(n_trunc=args.n_trunc)
+features = normalize(features, norm='l2', axis=1) # !! Important
 
 scores = features[:n_query] @ features[n_query:].T
 if hasattr(scores, 'todense'):
