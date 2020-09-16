@@ -41,7 +41,7 @@ n_query   = X_queries.shape[0]
 # Search
 
 features = TruncatedDiffusion(features=X, kd=args.kd).run(n_trunc=args.n_trunc)
-features = normalize(features, norm='l2', axis=1) # !! Important
+features = normalize(features, norm='l2', axis=1) # !! Important (for Oxford5k, at least)
 
 scores = features[:n_query] @ features[n_query:].T
 if hasattr(scores, 'todense'):
